@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Tracker Moderno</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+            background-color: #0a0a0a;
+            background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .timer-circle {
+            stroke-dasharray: 283;
+            stroke-dashoffset: 283;
+            transition: stroke-dashoffset 1s linear;
+        }
+        .hidden {
+            display: none;
+        }
+        /* Stili per le scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(192, 132, 252, 0.5);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(192, 132, 252, 0.8);
+        }
+        .modal-enter {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        .modal-leave {
+            animation: fadeOut 0.3s ease-in forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.95); }
+        }
+    </style>
+</head>
+<body class="text-white flex items-center justify-center min-h-screen p-4">
+
+    <div id="app-container" class="w-full max-w-md mx-auto">
+
+        <!-- Schermata di selezione -->
+        <div id="selection-screen" class="text-center">
+            <h1 class="text-4xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">Workout Tracker</h1>
+            <p class="text-gray-400 mb-10">Monitora e supera i tuoi limiti.</p>
+            <div class="space-y-4">
+                <button onclick="selectWorkout('A')" class="w-full text-lg font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 bg-gradient-to-br from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/20">
+                    Giorno A
+                </button>
+                <button onclick="selectWorkout('B')" class="w-full text-lg font-semibold py-4 px-6 rounded-xl transition-all transform hover:scale-105 bg-gradient-to-br from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 shadow-lg shadow-purple-500/20">
+                    Giorno B
+                </button>
+            </div>
+        </div>
+
+        <!-- Schermata dell'allenamento -->
+        <div id="workout-screen" class="hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h1 id="workout-title" class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500"></h1>
+                <div>
+                    <button onclick="confirmEndWorkout()" class="text-sm text-red-400 hover:text-red-300 transition mr-4 font-semibold">Termina Workout</button>
+                    <button onclick="confirmResetApp()" class="text-sm text-gray-400 hover:text-white transition">Cambia</button>
+                </div>
+            </div>
+            
+            <div class="glass-card p-6 rounded-2xl shadow-lg">
+                <div class="text-center mb-4">
+                    <p class="text-lg text-gray-400">Esercizio Corrente</p>
+                    <h2 id="exercise-name" class="text-4xl font-bold text-white"></h2>
+                    <p id="set-counter" class="text-xl text-cyan-300 mt-2"></p>
+                </div>
+                
+                <div id="last-workout-info" class="hidden bg-black/20 p-3 rounded-lg mb-4 text-center">
+                    <h4 class="font-semibold text-purple-300 mb-2">Ultima volta:</h4>
+                    <div id="last-workout-content" class="text-sm text-gray-300"></div>
+                </div>
+
+                <div id="timer-container" class="relative w-48 h-48 mx-auto mb-6 flex items-center justify-center">
+                    <svg class="absolute w-full h-full" viewBox="0 0 100 100">
+                        <circle class="text-gray-700/50" stroke-width="7" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" />
+                        <circle id="timer-progress" class="text-purple-400 timer-circle" stroke-width="7" stroke-linecap="round" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" style="transform: rotate(-90deg); transform-origin: 50% 50%;" />
+                    </svg>
+                    <div id="timer-display" class="text-5xl font-semibold"></div>
+                     <button id="skip-rest-button" onclick="confirmSkipRest()" class="hidden absolute bottom-0 mb-[-3rem] bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-4 rounded-lg text-sm transition-all shadow-lg">
+                        Salta Riposo
+                    </button>
+                </div>
+
+                <div id="inputs-container" class="space-y-4 mb-6">
+                    <div>
+                        <label for="weight-input" class="block text-sm font-medium text-gray-300 mb-1">Peso (kg)</label>
+                        <input type="number" id="weight-input" class="w-full bg-gray-700/50 border border-gray-600 rounded-md p-2 text-white text-center text-lg focus:ring-purple-500 focus:border-purple-500 transition" placeholder="0">
+                    </div>
+                    <div>
+                        <label for="notes-input" class="block text-sm font-medium text-gray-300 mb-1">Note</label>
+                        <textarea id="notes-input" rows="2" class="w-full bg-gray-700/50 border border-gray-600 rounded-md p-2 text-white focus:ring-purple-500 focus:border-purple-500 transition" placeholder="Sensazioni, difficoltà, etc."></textarea>
+                    </div>
+                </div>
+                <button id="action-button" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-6 rounded-lg text-xl transition-all disabled:bg-gray-600 disabled:cursor-not-allowed shadow-lg shadow-green-500/20"></button>
+                <button id="end-exercise-button" onclick="confirmEndExercise()" class="w-full mt-3 bg-gray-600 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg text-base transition-all">
+                    Finisci Esercizio
+                </button>
+                
+                <div class="flex justify-between items-center mt-4">
+                    <button id="prev-exercise-button" onclick="confirmPrevExercise()" class="p-3 bg-gray-600/50 hover:bg-gray-500/50 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <span class="text-sm text-gray-400">Naviga Esercizi</span>
+                    <button id="next-exercise-button" onclick="confirmNextExercise()" class="p-3 bg-gray-600/50 hover:bg-gray-500/50 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schermata di completamento -->
+        <div id="completion-screen" class="hidden text-center">
+            <h1 class="text-5xl font-bold text-green-400 mb-4">Grande!</h1>
+            <p class="text-xl text-gray-300 mb-8">Allenamento completato e salvato.</p>
+            <div id="summary-container" class="glass-card p-6 rounded-2xl shadow-lg text-left mb-8 max-h-[40vh] overflow-y-auto">
+                <h3 class="text-xl font-bold mb-4 text-cyan-400">Riepilogo Allenamento</h3>
+                <div id="summary-content" class="space-y-3"></div>
+            </div>
+            <button onclick="resetApp()" class="w-full text-lg font-semibold py-3 px-6 rounded-xl transition-all transform hover:scale-105 bg-gradient-to-br from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/20">Nuovo Allenamento</button>
+        </div>
+    </div>
+
+    <!-- Modal di Conferma -->
+    <div id="confirmation-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div id="modal-content" class="glass-card rounded-2xl shadow-xl p-6 w-full max-w-sm text-center">
+            <h3 id="modal-title" class="text-lg font-bold mb-4"></h3>
+            <div class="flex justify-center space-x-4 mt-6">
+                <button id="modal-cancel-button" class="w-full py-2 px-4 bg-gray-600 hover:bg-gray-500 rounded-lg transition">Annulla</button>
+                <button id="modal-confirm-button" class="w-full py-2 px-4 bg-red-500 hover:bg-red-400 rounded-lg transition">Conferma</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- CONFIGURAZIONE ---
+        const exercises = {
+            A: [ { name: 'Piegamenti' }, { name: 'Panca' }, { name: 'Squat' }, { name: 'Military Press' }, { name: 'Bicipiti' }, { name: 'Polpacci' } ],
+            B: [ { name: 'Trazioni' }, { name: 'Rematore' }, { name: 'Stacco' }, { name: 'Alzate Laterali' }, { name: 'Tricipiti' }, { name: 'Avambracci/Polsi' } ]
+        };
+        const TOTAL_SETS = 4;
+        const REST_BETWEEN_SETS = 60;
+        const REST_BETWEEN_EXERCISES = 120;
+        const HISTORY_KEY = 'workoutHistory';
+
+        // --- STATO DELL'APPLICAZIONE ---
+        let currentState = { workoutId: null, exerciseIndex: 0, currentSet: 1, isResting: false, timer: null, timerId: null, workoutData: [] };
+        let workoutHistory = {};
+        let onRestCompleteCallback = null; // Callback per il riposo
+
+        // --- ELEMENTI DEL DOM ---
+        const selectionScreen = document.getElementById('selection-screen');
+        const workoutScreen = document.getElementById('workout-screen');
+        const completionScreen = document.getElementById('completion-screen');
+        const workoutTitle = document.getElementById('workout-title');
+        const exerciseName = document.getElementById('exercise-name');
+        const setCounter = document.getElementById('set-counter');
+        const timerDisplay = document.getElementById('timer-display');
+        const timerProgress = document.getElementById('timer-progress');
+        const weightInput = document.getElementById('weight-input');
+        const notesInput = document.getElementById('notes-input');
+        const actionButton = document.getElementById('action-button');
+        const inputsContainer = document.getElementById('inputs-container');
+        const timerContainer = document.getElementById('timer-container');
+        const lastWorkoutInfo = document.getElementById('last-workout-info');
+        const lastWorkoutContent = document.getElementById('last-workout-content');
+        const prevExerciseButton = document.getElementById('prev-exercise-button');
+        const nextExerciseButton = document.getElementById('next-exercise-button');
+        const skipRestButton = document.getElementById('skip-rest-button');
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const modalContent = document.getElementById('modal-content');
+        const modalTitle = document.getElementById('modal-title');
+        const modalConfirmButton = document.getElementById('modal-confirm-button');
+        const modalCancelButton = document.getElementById('modal-cancel-button');
+
+
+        // --- LOGICA PRINCIPALE ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadWorkoutHistory();
+            timerContainer.classList.add('hidden');
+        });
+
+        function selectWorkout(id) {
+            currentState.workoutId = id;
+            currentState.workoutData = exercises[id].map(ex => ({ name: ex.name, sets: [], date: new Date().toISOString() }));
+            selectionScreen.classList.add('hidden');
+            workoutScreen.classList.remove('hidden');
+            updateUI();
+        }
+
+        function updateUI() {
+            if (!currentState.workoutId || currentState.exerciseIndex >= exercises[currentState.workoutId].length) {
+                showCompletionScreen();
+                return;
+            }
+            const currentExercise = exercises[currentState.workoutId][currentState.exerciseIndex];
+            workoutTitle.textContent = `Giorno ${currentState.workoutId}`;
+            exerciseName.textContent = currentExercise.name;
+            setCounter.textContent = `Serie ${currentState.currentSet} di ${TOTAL_SETS}`;
+            
+            displayLastWorkoutData();
+
+            inputsContainer.classList.remove('hidden');
+            timerContainer.classList.add('hidden');
+            skipRestButton.classList.add('hidden');
+            actionButton.disabled = false;
+            actionButton.textContent = `Serie Completata (Riposo ${REST_BETWEEN_SETS}s)`;
+            actionButton.onclick = handleSetCompletion;
+            weightInput.value = '';
+            notesInput.value = '';
+            weightInput.focus();
+
+            prevExerciseButton.disabled = currentState.exerciseIndex === 0;
+            nextExerciseButton.disabled = currentState.exerciseIndex === exercises[currentState.workoutId].length - 1;
+        }
+
+        function handleSetCompletion() {
+            saveSetData();
+            const restTime = currentState.currentSet < TOTAL_SETS ? REST_BETWEEN_SETS : REST_BETWEEN_EXERCISES;
+            const onRestComplete = () => {
+                if (currentState.currentSet < TOTAL_SETS) {
+                    currentState.currentSet++;
+                    updateUIForNextSet();
+                } else {
+                    handleEndExercise(false);
+                }
+            };
+            startRest(restTime, onRestComplete);
+        }
+        
+        function updateUIForNextSet() {
+            setCounter.textContent = `Serie ${currentState.currentSet} di ${TOTAL_SETS}`;
+            actionButton.disabled = false;
+            actionButton.textContent = `Inizia Serie ${currentState.currentSet}`;
+            actionButton.onclick = () => {
+                inputsContainer.classList.remove('hidden');
+                timerContainer.classList.add('hidden');
+                skipRestButton.classList.add('hidden');
+                actionButton.textContent = `Serie Completata (Riposo ${REST_BETWEEN_SETS}s)`;
+                actionButton.onclick = handleSetCompletion;
+                weightInput.focus();
+            };
+            inputsContainer.classList.remove('hidden');
+            timerContainer.classList.add('hidden');
+            skipRestButton.classList.add('hidden');
+        }
+
+        function startRest(duration, onComplete) {
+            currentState.isResting = true;
+            currentState.timer = duration;
+            onRestCompleteCallback = onComplete; // Salva la callback
+            
+            inputsContainer.classList.add('hidden');
+            timerContainer.classList.remove('hidden');
+            skipRestButton.classList.remove('hidden');
+            actionButton.disabled = true;
+            actionButton.textContent = "Riposo..."
+            
+            const totalDashArray = 283;
+            timerProgress.style.transition = 'none';
+            timerProgress.style.strokeDashoffset = totalDashArray;
+            timerProgress.offsetHeight; 
+            timerProgress.style.transition = `stroke-dashoffset ${duration}s linear`;
+            timerProgress.style.strokeDashoffset = 0;
+
+            timerDisplay.textContent = formatTime(currentState.timer);
+            currentState.timerId = setInterval(() => {
+                currentState.timer--;
+                timerDisplay.textContent = formatTime(currentState.timer);
+                if (currentState.timer <= 0) {
+                    clearInterval(currentState.timerId);
+                    currentState.isResting = false;
+                    onRestCompleteCallback = null;
+                    const synth = new Tone.Synth().toDestination();
+                    synth.triggerAttackRelease("C5", "8n");
+                    onComplete();
+                }
+            }, 1000);
+        }
+
+        function saveSetData() {
+            currentState.workoutData[currentState.exerciseIndex].sets.push({
+                set: currentState.currentSet,
+                weight: weightInput.value || '0',
+                notes: notesInput.value || 'N/A'
+            });
+        }
+
+        function showCompletionScreen() {
+            saveWorkoutToHistory();
+            workoutScreen.classList.add('hidden');
+            completionScreen.classList.remove('hidden');
+
+            const summaryContent = document.getElementById('summary-content');
+            summaryContent.innerHTML = '';
+            currentState.workoutData.forEach(exercise => {
+                if (exercise.sets.length === 0) return;
+                const exerciseDiv = document.createElement('div');
+                exerciseDiv.className = 'p-3 bg-black/20 rounded-md';
+                let exerciseHTML = `<p class="font-bold text-white">${exercise.name}</p><ul class="text-gray-300 text-sm space-y-1 mt-1">`;
+                exercise.sets.forEach(set => {
+                    exerciseHTML += `<li class="flex justify-between"><span>Serie ${set.set}: <strong>${set.weight} kg</strong></span> <span class="text-gray-400 italic">${set.notes}</span></li>`;
+                });
+                exerciseHTML += `</ul>`;
+                exerciseDiv.innerHTML = exerciseHTML;
+                summaryContent.appendChild(exerciseDiv);
+            });
+        }
+
+        function resetApp() {
+            clearInterval(currentState.timerId);
+            currentState = { workoutId: null, exerciseIndex: 0, currentSet: 1, isResting: false, timer: null, timerId: null, workoutData: [] };
+            selectionScreen.classList.remove('hidden');
+            workoutScreen.classList.add('hidden');
+            completionScreen.classList.add('hidden');
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+        }
+
+        // --- GESTIONE MODALE DI CONFERMA ---
+
+        function showConfirmation(title, onConfirm) {
+            modalTitle.textContent = title;
+            modalConfirmButton.onclick = () => {
+                hideConfirmation();
+                onConfirm();
+            };
+            modalCancelButton.onclick = hideConfirmation;
+            confirmationModal.classList.remove('hidden');
+            modalContent.classList.remove('modal-leave');
+            modalContent.classList.add('modal-enter');
+        }
+
+        function hideConfirmation() {
+            modalContent.classList.remove('modal-enter');
+            modalContent.classList.add('modal-leave');
+            setTimeout(() => {
+                confirmationModal.classList.add('hidden');
+            }, 300);
+        }
+
+        // --- FUNZIONI DI CONTROLLO WORKOUT CON CONFERMA ---
+
+        function confirmSkipRest() {
+            showConfirmation('Sei sicuro di voler saltare il riposo?', skipRest);
+        }
+        
+        function skipRest() {
+            clearInterval(currentState.timerId);
+            currentState.isResting = false;
+            if (onRestCompleteCallback) {
+                const callback = onRestCompleteCallback;
+                onRestCompleteCallback = null;
+                callback();
+            }
+        }
+
+        function confirmEndExercise() {
+            showConfirmation('Sei sicuro di voler finire questo esercizio?', () => handleEndExercise(true));
+        }
+        
+        function confirmNextExercise() {
+            if (nextExerciseButton.disabled) return;
+            showConfirmation('Passare al prossimo esercizio?', () => handleEndExercise(true));
+        }
+
+        function confirmPrevExercise() {
+            if (prevExerciseButton.disabled) return;
+            showConfirmation('Tornare all\'esercizio precedente?', handlePrevExercise);
+        }
+
+        function confirmEndWorkout() {
+            showConfirmation('Sei sicuro di voler terminare il workout?', showCompletionScreen);
+        }
+
+        function confirmResetApp() {
+            showConfirmation('Cambiare allenamento? I progressi non salvati andranno persi.', resetApp);
+        }
+
+        function handleEndExercise(askConfirmation) {
+            if (currentState.exerciseIndex < exercises[currentState.workoutId].length - 1) {
+                currentState.exerciseIndex++;
+                currentState.currentSet = 1;
+                updateUI();
+            } else {
+                showCompletionScreen();
+            }
+        }
+
+        function handlePrevExercise() {
+            if (currentState.exerciseIndex > 0) {
+                currentState.exerciseIndex--;
+                currentState.currentSet = 1;
+                updateUI();
+            }
+        }
+
+        // --- GESTIONE STORICO ---
+
+        function loadWorkoutHistory() {
+            const history = localStorage.getItem(HISTORY_KEY);
+            workoutHistory = history ? JSON.parse(history) : {};
+        }
+
+        function saveWorkoutToHistory() {
+            if (!currentState.workoutId) return;
+            if (!workoutHistory[currentState.workoutId]) {
+                workoutHistory[currentState.workoutId] = [];
+            }
+            const completedExercises = currentState.workoutData.filter(ex => ex.sets.length > 0);
+            if (completedExercises.length > 0) {
+                workoutHistory[currentState.workoutId].push(currentState.workoutData);
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(workoutHistory));
+            }
+        }
+
+        function displayLastWorkoutData() {
+            const historyForType = workoutHistory[currentState.workoutId];
+            if (!historyForType || historyForType.length === 0) {
+                lastWorkoutInfo.classList.add('hidden');
+                return;
+            }
+
+            const lastWorkout = historyForType[historyForType.length - 1];
+            const currentExerciseName = exercises[currentState.workoutId][currentState.exerciseIndex].name;
+            const lastExerciseData = lastWorkout.find(ex => ex.name === currentExerciseName);
+
+            if (lastExerciseData && lastExerciseData.sets.length > 0) {
+                let content = '<ul class="space-y-1">';
+                lastExerciseData.sets.forEach(set => {
+                    content += `<li class="flex justify-center gap-4"><span>Serie ${set.set}: <strong>${set.weight} kg</strong></span> <span class="text-gray-400 italic">${set.notes}</span></li>`;
+                });
+                content += '</ul>';
+                lastWorkoutContent.innerHTML = content;
+                lastWorkoutInfo.classList.remove('hidden');
+            } else {
+                lastWorkoutInfo.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
+
